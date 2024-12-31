@@ -19,11 +19,13 @@ from cortex import Cortex # import Cortex library
 
 cortex = Cortex(client_id, client_secret) # instantiate Cortex object - also opens WebSocket connection
 
-result = cortex.await_response( api_call=self.cortex.get_user_login )
+result = cortex.await_response( api_call=cortex.get_user_login )
 # make a request to the API with ^ 'await_response'
 
 cortex.close() # closes the WebSocket connection
 ```
+
+To call a different API method, simply replace _get_user_login_ with another method from the Cortex API [documentation](https://emotiv.gitbook.io/cortex-api/overview-of-api-flow), as well as its necessary parameters.
 
 # Key Changes
 
