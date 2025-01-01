@@ -13,13 +13,16 @@ To have this control, I realized I would have to rework cortex.py to fit my need
 
 # Demo
 
+## Setup
+Clone the repository: `git clone https://github.com/jamesmcaleer/EmotivPythonLibraryRework.git`
+
 ## Requirements
 - This example works with Python >= 3.7
 - Install websocket client via `pip install websocket-client`
 - Install python-dispatch via `pip install python-dispatch`
 
 Use the new Cortex library to call the Cortex API and receieve a response in just _four_ lines of Python code:
-```
+```python
 from cortex import Cortex # import Cortex library
 
 cortex = Cortex(client_id, client_secret) # instantiate Cortex object - also opens WebSocket connection
@@ -39,7 +42,7 @@ To call a different API method, simply replace _get_user_login_ with another met
 
 The 'handle' methods would be called when the WebSocket sends back a response. And depending on the API call, a different thing would happen.
 ex: 
-```
+```python
 def handle_result(self, recv_dic):
   req_id = recv_dic['id']
   result_dic = recv_dic['result']
@@ -54,14 +57,14 @@ def handle_result(self, recv_dic):
 ```
 This controls the flow of the program too much and does not give developers the chance to display UI or anything else in between these API calls.
 My solution is replacing _handle_result()_ with _emit_result()_:
-```
+```python
 def emit_result(self, res_dic):
-    # lets just get the result and emit it
+  # lets just get the result and emit it
 
-    req_id = res_dic['id']
-    result_dic = res_dic['result']
+  req_id = res_dic['id']
+  result_dic = res_dic['result']
 
-    self.emit(REQUEST_TO_EMIT[req_id], result_dic)
+  self.emit(REQUEST_TO_EMIT[req_id], result_dic)
 ```
 which takes the response of the WebSocket and emits it through an event.
 
@@ -71,12 +74,12 @@ Depending on the 'request_id', a different event is emitted, and there is an eve
 _bind()_ is what allows us to trigger a function call when an event is received.
 
 In examples from the Emotiv repository, such as [record.py](https://github.com/Emotiv/cortex-example/blob/master/python/record.py), there would be a seperate class to serve as an example of how to use the Cortex library to call and handle API calls.
-```
+```python
 class Record():
-    def __init__(self, app_client_id, app_client_secret, **kwargs):
-        self.c = Cortex(app_client_id, app_client_secret, debug_mode=True, **kwargs)
-        self.c.bind(create_session_done=self.on_create_session_done)
-        self.c.bind(create_record_done=self.on_create_record_done)
+  def __init__(self, app_client_id, app_client_secret, **kwargs):
+    self.c = Cortex(app_client_id, app_client_secret, debug_mode=True, **kwargs)
+    self.c.bind(create_session_done=self.on_create_session_done)
+    self.c.bind(create_record_done=self.on_create_record_done)
 ```
 And inside _these_ example classes would be the binding of API events to functions like _on_create_record_done()_ that do a certain action when the response from 'createRecord' is sent from the API.
 
@@ -84,7 +87,7 @@ The problem I saw in this approach is that the developer needs an _on_BLANK_done
 
 That is why I created the bindings _inside_ the Cortex class, so that Cortex can listen for when these events are complete and send back to the developer the intended response.
 
-```
+```python
 class Cortex(Dispatcher):
   def __init__(self, ...):
     ...
@@ -99,22 +102,22 @@ class Cortex(Dispatcher):
 ```
 
 And then when the result of the API call is emitted, this method runs:
-```
+```python
 def on_request_done(self, result_dic):
   self.current_result = result_dic
   self.response_event.set()  # Signal that the response is ready
 ```
 
 Lastly we have the method that the developer will be calling, so that they can easily call an API, and receieve the response:
-```
+```python
 def await_response(self, api_call, **kwargs):
-        self.response_event.clear()  # Reset the event
-        api_call(**kwargs)  # Call the provided API function
-        self.response_event.wait()  # Wait for the corresponding event
-        result_dic = self.current_result
+  self.response_event.clear()  # Reset the event
+  api_call(**kwargs)  # Call the provided API function
+  self.response_event.wait()  # Wait for the corresponding event
+  result_dic = self.current_result
 
-        expected_event = api_call.__name__ + '_done'
-        return result_dic
+  expected_event = api_call.__name__ + '_done'
+  return result_dic
 ```
 
 This works for **all** of the API functions listed in the Cortex API documentation.
@@ -126,35 +129,35 @@ I also created similar **warning** and **error** _emitters_ so that the develope
 Another problem I noticed is that the functions in [cortex.py[(https://github.com/Emotiv/cortex-example/blob/master/python/cortex.py) don't take in all of the parameters that the API call requires.
 
 This is because Cortex would store things such as the _token_ and _headset_id_ within the Cortex object, and automatically use that value for the API call.
-```
+```python
 def get_current_profile(self):
-    print('get current profile:')
-    get_profile_json = {
-        "jsonrpc": "2.0",
-        "method": "getCurrentProfile",
-        "params": {
-          "cortexToken": self.auth,
-          "headset": self.headset_id,
-        },
-        "id": GET_CURRENT_PROFILE_ID
-    }
-    self.ws.send(json.dumps(get_profile_json))
+  print('get current profile:')
+  get_profile_json = {
+      "jsonrpc": "2.0",
+      "method": "getCurrentProfile",
+      "params": {
+        "cortexToken": self.auth,
+        "headset": self.headset_id,
+      },
+      "id": GET_CURRENT_PROFILE_ID
+  }
+  self.ws.send(json.dumps(get_profile_json))
 ```
 
 I wanted these functions to match the documentation as close as possible, and also have the _developer_ manage variables such as the _token_, not Cortex.
-```
+```python
 def get_current_profile(self, cortex_token, headset_id):
-    print('get current profile:')
-    request = {
-        "jsonrpc": "2.0",
-        "method": "getCurrentProfile",
-        "id": GET_CURRENT_PROFILE,
-        "params": {
-            "cortexToken": cortex_token,
-            "headset": headset_id
-        }
-    }
-    self.ws.send(json.dumps(request))
+  print('get current profile:')
+  request = {
+      "jsonrpc": "2.0",
+      "method": "getCurrentProfile",
+      "id": GET_CURRENT_PROFILE,
+      "params": {
+          "cortexToken": cortex_token,
+          "headset": headset_id
+      }
+  }
+  self.ws.send(json.dumps(request))
 ```
 That is why **all** API functions require the parameters indicated in the Cortex API documentation.
 
