@@ -13,7 +13,12 @@ To have this control, I realized I would have to rework cortex.py to fit my need
 
 # Demo
 
-Using the new Cortex library to call the Cortex API and receieve the response can be done in four lines:
+## Requirements
+- This example works with Python >= 3.7
+- Install websocket client via `pip install websocket-client`
+- Install python-dispatch via `pip install python-dispatch`
+
+Use the new Cortex library to call the Cortex API and receieve a response in just _four_ lines of Python code:
 ```
 from cortex import Cortex # import Cortex library
 
