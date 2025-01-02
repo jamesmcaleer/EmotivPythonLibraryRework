@@ -52,12 +52,8 @@ A successful response from the API **normally** comes in this form:
   "id": 1,
   "jsonrpc": "2.0",
   "result": {
-      "cortexToken":"xxx",
-      "warning": {
-          "code": 6,
-          "message": "...",
-          "licenseUrl": "https://..."
-      }
+      "cortexToken": "xxx",
+      "message": "..."
   }
 }
 ```
