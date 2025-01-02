@@ -13,17 +13,15 @@ Coming from the perspective of a developer, I wanted to have control over these 
 
 To have this control, I realized I would have to rework cortex.py to fit my needs as a developer. 
 
-# Demo
-
-## Setup
+# Setup
 Clone the repository: `git clone https://github.com/jamesmcaleer/EmotivPythonLibraryRework.git`
 
-## Requirements
+# Requirements
 - This example works with Python >= 3.7
 - Install websocket client via `pip install websocket-client`
 - Install python-dispatch via `pip install python-dispatch`
 
-## Example
+# Demo
 
 Use the new Cortex library to call the Cortex API and receieve a response in just _four_ lines of Python code:
 ```python
