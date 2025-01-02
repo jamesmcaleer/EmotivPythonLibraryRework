@@ -11,7 +11,7 @@ For example, once the WebSocket is opened and the event _open_ is recieved, _on_
 
 Coming from the perspective of a developer, I wanted to have control over these steps. Maybe I want to choose a Subject before I create a session. Maybe I want a button that allows the user to select which headset to connect to.
 
-To have this control, I realized I would have to rework cortex.py to fit my needs as a developer. 
+To have this control, I made some changes to cortex.py to fit my needs as a developer. 
 
 # Setup
 Clone the repository: `git clone https://github.com/jamesmcaleer/EmotivPythonLibraryRework.git`
