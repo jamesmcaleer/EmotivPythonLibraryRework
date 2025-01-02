@@ -183,7 +183,7 @@ class Cortex(Dispatcher):
     'headset_cannot_work_with_blte_warning', 'headset_cannot_connect_disable_motion_warning', 'headset_scanning_finished_warning',
     
     # STREAM EVENTS
-    'new_data_labels', 'new_com_data', 'new_fe_data', 'new_eeg_data', 'new_mot_data', 'new_dev_data', 'new_met_data', 'new_pow_data', 'new_sys_data'
+    'new_data_labels', 'new_com_data', 'new_fe_data', 'new_eeg_data', 'new_mot_data', 'new_dev_data', 'new_eq_data', 'new_met_data', 'new_pow_data', 'new_sys_data'
     ]
 
 
@@ -206,6 +206,8 @@ class Cortex(Dispatcher):
         'eula_accpeted_warning', 'diskspace_low_warning', 'diskspace_critical_warning', 'cortex_record_post_processing_done_warning', 
         'headset_cannot_connected_timeout_warning', 'headset_disconnected_timeout_warning', 'headset_connected_warning', 
         'headset_cannot_work_with_blte_warning', 'headset_cannot_connect_disable_motion_warning', 'headset_scanning_finished_warning']
+
+        self.stream_events = ['new_data_labels', 'new_com_data', 'new_fe_data', 'new_eeg_data', 'new_mot_data', 'new_dev_data', 'new_met_data', 'new_pow_data', 'new_sys_data']
 
         self.debug = debug_mode
         self.debit = debit
@@ -240,6 +242,12 @@ class Cortex(Dispatcher):
 
         for event in self.warning_events:
             self.bind(**{event: self.on_warning_done})
+
+        self.current_stream_data = None
+        self.stream_event = threading.Event()
+
+        for event in self.stream_events:
+            self.bind(**{event: self.on_stream_done})
 
     def open(self):
         url = "wss://localhost:6868"
@@ -279,11 +287,12 @@ class Cortex(Dispatcher):
     def on_warning_done(self, warning_dic):
         self.current_warning = warning_dic
         self.warning_event.set() 
+    
+    def on_stream_done(self, data):
+        self.current_stream_data = data
+        self.stream_event.set() 
 
     def await_response(self, api_call, **kwargs):
-        """Call an API function and wait for the corresponding response."""
-        
-
         self.response_event.clear()  # Reset the event
         api_call(**kwargs)  # Call the provided API function
         self.response_event.wait()  # Wait for the corresponding event
@@ -294,17 +303,20 @@ class Cortex(Dispatcher):
         return result_dic
 
     def await_warning(self, **kwargs):
-        """Call an API function and wait for the corresponding response."""
-        
-
         self.warning_event.clear()  # Reset the event
-        #api_call(**kwargs)  # Call the provided API function
+
         self.warning_event.wait()  # Wait for the corresponding event
         warning_dic = self.current_warning
 
-        #expected_event = api_call.__name__ + '_warning'
-        #print(f"Data received for {expected_event}: {result_dic}")
         return warning_dic
+
+    def await_stream_data(self, **kwargs):
+        self.stream_event.clear()  # Reset the event
+
+        self.stream_event.wait()  # Wait for the corresponding event
+        data = self.current_stream_data
+
+        return data
 
     # WEBSOCKET EVENTS ----------
 
@@ -329,7 +341,7 @@ class Cortex(Dispatcher):
 
     def on_error(self, *args):
         if len(args) == 2:
-            print(str(args[1]))
+            print('on_error', str(args[1]))
 
     def on_close(self, *args, **kwargs):
         print("WebSocket connection closed.")
@@ -365,8 +377,8 @@ class Cortex(Dispatcher):
         
         if result_dic.get('com') != None:
             com_data = {}
-            com_data['action'] = result_dic['com'][0]
-            com_data['power'] = result_dic['com'][1]
+            com_data['act'] = result_dic['com'][0]
+            com_data['pow'] = result_dic['com'][1]
             com_data['time'] = result_dic['time']
             self.emit('new_com_data', data=com_data)
         elif result_dic.get('fac') != None:
@@ -388,7 +400,6 @@ class Cortex(Dispatcher):
             mot_data = {}
             mot_data['mot'] = result_dic['mot']
             mot_data['time'] = result_dic['time']
-            print(mot_data)
             self.emit('new_mot_data', data=mot_data)
         elif result_dic.get('dev') != None:
             dev_data = {}
@@ -397,6 +408,13 @@ class Cortex(Dispatcher):
             dev_data['batteryPercent'] = result_dic['dev'][3]
             dev_data['time'] = result_dic['time']
             self.emit('new_dev_data', data=dev_data)
+        elif result_dic.get('eq') != None:
+            eq_data = {}
+            eq_data['batteryPercent'] = result_dic['eq'][0]
+            eq_data['overall'] = result_dic['eq'][1]
+            eq_data['sampleRateQuality'] = result_dic['eq'][2]
+            eq_data['sensors'] = result_dic['eq'][3:]
+            self.emit('new_eq_data', data=eq_data)
         elif result_dic.get('met') != None:
             met_data = {}
             met_data['met'] = result_dic['met']
@@ -410,8 +428,8 @@ class Cortex(Dispatcher):
         elif result_dic.get('sys') != None:
             sys_data = result_dic['sys']
             self.emit('new_sys_data', data=sys_data)
-        else :
-            print(result_dic)
+        else:
+            print('unknown:',result_dic)
 
     # END OF EMITTERS ------------- ^
 

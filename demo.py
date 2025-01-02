@@ -1,7 +1,10 @@
 from cortex import Cortex
 from colorama import Fore, Back, Style
 
+FRAMES_PER_SECOND = 30
+
 class Demo:
+
     def __init__(self, client_id, client_secret, debug):
         self.client_id = client_id
         self.client_secret = client_secret
@@ -124,10 +127,7 @@ class Demo:
         self.current_record = None
 
     def create_record(self):
-        self.find_headset()
-
-        self.select_streams()
-
+    
         create_record_params = {
             'api_call': self.cortex.create_record,
             'session_id': self.session_id,
@@ -139,24 +139,27 @@ class Demo:
             create_record_params['title'] = title
         
         print(f'The following are {Fore.RED}NOT{Style.RESET_ALL} required, press {Fore.BLUE}enter{Style.RESET_ALL} to leave blank')
-        subject_name = input(f'subject name: ')
-        if subject_name:
-            create_record_params['subjectName'] = subject_name
+        
+        if self.current_subject["subjectName"]:
+            create_record_params['subjectName'] = self.current_subject["subjectName"]
         else:
-            subject_name = self.subject_name
+            subject_name = input(f'subject name: ')
+            create_record_params['subjectName'] = subject_name
         
         description = input(f'description: ')
         if description:
             create_record_params['description'] = description
 
-        #result = cortex.await_response( api_call=cortex.update_session, cortex_token=token, session_id=session_id, status="active")
+        result = self.cortex.await_response( api_call=self.cortex.update_session, cortex_token=self.token, session_id=self.session_id, status="active")
 
-        #result = cortex.await_response( **create_record_params )
-        #print(f'{Fore.YELLOW}Record{Style.RESET_ALL} {Fore.GREEN}successfully created!{Style.RESET_ALL}')
-        #current_record = result
+        result = self.cortex.await_response( **create_record_params )
+        print(f'{Fore.YELLOW}Record{Style.RESET_ALL} {Fore.GREEN}successfully created!{Style.RESET_ALL}')
+        self.current_record = result
+
+    def select_record(self):
+        self.record_ids = [self.all_records['records'][self.record_index]['uuid']] 
 
     def display_record_info(self):
-        self.record_ids = [self.all_records['records'][self.record_index]['uuid']] 
         result = self.cortex.await_response( api_call=self.cortex.get_record_infos, cortex_token=self.token, record_ids=self.record_ids) # get record with markers
         self.current_record = result[0]
 
@@ -168,6 +171,7 @@ class Demo:
     def find_headset(self):
         result = self.cortex.await_response( api_call=self.cortex.control_device, command="refresh")
         print(f'{Fore.MAGENTA}{result}{Style.RESET_ALL}')
+        print(f'Search will take about {Fore.MAGENTA}20 seconds...{Style.RESET_ALL}')
         warning = self.cortex.await_warning() # wait for warning 142 - headset scan finished
         print(warning)
         result = self.cortex.await_response( api_call=self.cortex.query_headsets )
@@ -183,8 +187,8 @@ class Demo:
 
         result = self.cortex.await_response( api_call=self.cortex.create_session, cortex_token=self.token, headset_id=self.headset_id, status="open")
         try:
-            print(result['code'])
-            print(result['message'])
+            print(f'code {Fore.RED}{result['code']}{Style.RESET_ALL}')
+            print(f'{Fore.RED}{result['message']}{Style.RESET_ALL}')
             return
         except KeyError:
             pass
@@ -197,7 +201,7 @@ class Demo:
             0: "mot",
             1: "dev",
             2: "eq",
-            3: "power",
+            3: "pow",
             4: "met", 
             5: "fac",
             6: "sys"
@@ -210,42 +214,76 @@ class Demo:
         stream_index = 0
         while stream_index >= 0 and stream_index <= 6:
             stream_index = int(input(f"pick a {Fore.YELLOW}stream{Style.RESET_ALL} from the available {Fore.YELLOW}streams{Style.RESET_ALL} ({Fore.MAGENTA}-1{Style.RESET_ALL} to finish picking): "))
-            if stream_index not in self.streams:
+            
+            if stream_index == -1:
+                print(f'{Fore.MAGENTA}picking finished ---{Style.RESET_ALL}')
+            elif stream_index not in self.streams:
                 self.streams.append(stream_index)
                 print(f'stream {Fore.GREEN}added!{Style.RESET_ALL}')
             else:
                 print(f'stream {Fore.RED}already entered{Style.RESET_ALL}')
 
+        print(self.streams)
         for i in range(len(self.streams)):
-            self.streams[i] = stream_dic[i]
+            self.streams[i] = stream_dic[self.streams[i]]
         
         print(f'{Fore.YELLOW}streams{Style.RESET_ALL}: {self.streams}')
         result = self.cortex.await_response( api_call=self.cortex.subscribe, cortex_token=self.token, session_id=self.session_id, streams=self.streams)
         print(f'{Fore.GREEN}success{Style.RESET_ALL}: {result['success']}')
         print(f'{Fore.RED}failure{Style.RESET_ALL}: {result['failure']}')
 
+    def start_stream(self):
+        seconds = int(input(f'length of recording {Fore.CYAN}(seconds){Style.RESET_ALL}: '))
 
-client_id = ''
-client_secret = ''
+        frames = FRAMES_PER_SECOND * seconds 
+
+        for i in range(frames):
+            result = self.cortex.await_stream_data()
+            print(result)
+
+    def stop_record(self):
+        result = self.cortex.await_response( api_call=self.cortex.stop_record, cortex_token=self.token, session_id=self.session_id)
+        self.cortex.await_warning() # wait for warning 30
+        print(f'{Fore.YELLOW}Record{Style.RESET_ALL} {Fore.GREEN}successfully{Style.RESET_ALL} stopped')
+        self.record_ids = [result['record']['uuid']]
+
+
+client_id = 'vdKgSHlfEJillybmFxYQuGRhRu71cxRBaFzY4zQg'
+client_secret =                                                                                                                                                 'ZlMnhrQGEelAALvY27FYFaf8COVOyXMcuGjscnzU0HbMBb66JP8ggsVfgqi00oFJ37QFSJN9fWtqZ2xCqt7Q5XSkhaKYw6TS6qc52T0w4IUm2Diukb62P2NYY16IK1Rk'
 debug = False
 
 demo = Demo(client_id, client_secret, debug)
 
+# these demo functions that i call below are NOT api calls
+# they are just examples of the type of application a developer can make
+
+# inside these functions you will find api calls that use Cortex and handle the responses
+
 demo.authorize_user()
 demo.display_user_info()
 
-demo.show_subjects()
-if demo.subject_index == -1:
+demo.show_subjects() # show subjects and get user input
+if demo.subject_index == -1: # if user wants to create new subject
     demo.create_subject()
-else:
+else: # user selected existing subject
     demo.select_subject()
 
-demo.display_subject_info()
+demo.display_subject_info() # in depth information about selected subject
 
-demo.show_records()
-if demo.record_index == -1:
+demo.show_records() # show records of selected subject and get user input
+if demo.record_index == -1: # if user wants to create new record
+    demo.find_headset()
+
     demo.create_record()
-else:
-    demo.display_record_info()
+
+    demo.select_streams()
+
+    demo.start_stream() 
+
+    demo.stop_record()
+else: # user selected existing record
+    demo.select_record()
+
+demo.display_record_info()
 
 demo.cortex.close()
