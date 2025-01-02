@@ -41,7 +41,7 @@ To call a different API method, simply replace _get_user_login_ with another met
 
 To call and store the result of any function in the Cortex API:
 ```python
-result = cortex.await_response( api_call=cortex.[function_name] )
+result = cortex.await_response( api_call=cortex.[function_name], parameter_one=[value_one], parameter_two=[value_two] )
 ```
 Replace _method_name_ with any method listed in the Cortex API [documentation](https://emotiv.gitbook.io/cortex-api/overview-of-api-flow), converted from _camelCase_ to _snake_case_.
 
