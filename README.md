@@ -1,4 +1,6 @@
-This repository features a rework of the [Emotiv Python](https://github.com/Emotiv/cortex-example/tree/master/python) library, specifically the [cortex.py](https://github.com/Emotiv/cortex-example/blob/master/python/cortex.py) file.
+This repository features a rework of the [Emotiv Python](https://github.com/Emotiv/cortex-example/tree/master/python) library, specifically the [cortex.py](https://github.com/Emotiv/cortex-example/blob/master/python/cortex.py) file. 
+
+It also includes a text-based interface, demo.py, that features using the new library to interact with most components of the Cortex API.
 
 # Reason for rework
 When I learned about the [Cortex API](https://emotiv.gitbook.io/cortex-api/overview-of-api-flow), I wanted to use the functions to build a GUI that lets users see the process of Authentication, connect to specific Headsets, choose/create a Subject, choose/create a Record, and more.
@@ -21,6 +23,8 @@ Clone the repository: `git clone https://github.com/jamesmcaleer/EmotivPythonLib
 - Install websocket client via `pip install websocket-client`
 - Install python-dispatch via `pip install python-dispatch`
 
+## Example
+
 Use the new Cortex library to call the Cortex API and receieve a response in just _four_ lines of Python code:
 ```python
 from cortex import Cortex # import Cortex library
@@ -28,14 +32,83 @@ from cortex import Cortex # import Cortex library
 cortex = Cortex(client_id, client_secret) # instantiate Cortex object - also opens WebSocket connection
 
 result = cortex.await_response( api_call=cortex.get_user_login )
-# make a request to the API with ^ 'await_response'
+# make a request to the API with 'await_response'
 
 cortex.close() # closes the WebSocket connection
 ```
 
 To call a different API method, simply replace _get_user_login_ with another method from the Cortex API [documentation](https://emotiv.gitbook.io/cortex-api/overview-of-api-flow), as well as its necessary parameters.
 
+# Quick Documentation
+
+To call and store the result of any function in the Cortex API:
+```python
+result = cortex.await_response( api_call=cortex.[function_name] )
+```
+Replace _method_name_ with any method listed in the Cortex API [documentation](https://emotiv.gitbook.io/cortex-api/overview-of-api-flow), converted from _camelCase_ to _snake_case_.
+
+## Important ⚠️
+A successful response from the API **normally** comes in this form:
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+      "cortexToken":"xxx",
+      "warning": {
+          "code": 6,
+          "message": "...",
+          "licenseUrl": "https://..."
+      }
+  }
+}
+```
+**BUT** the Cortex library will just give you what is _inside_ the "result" field. Meaning that whatever _await_response_ returns will be the result of the API call.
+
+This is what the result variable would contain for an example API call (content of result **will** vary):
+```json
+{
+  "cortexToken": "xxx",
+  "message": "..."
+}
+```
+
+## Error Handling
+If the API call does not go through, your _result_ variable will instead contain an error with two fields:
+```json
+{
+  "code": -32600,
+  "message": "..."
+}
+```
+
+## Warnings and Stream Data
+Similar to _await_response_, Cortex has methods to await _warnings_ and _stream_data_:
+```python
+warning = cortex.await_warning() # wait for ANY warning
+
+data_sample = cortex.await_stream_data() # wait for data sample to come in and store it
+```
+
+At the moment, these two methods do not take arguments because they simply wait for responses from Cortex.
+
+In other words, calling these methods does not trigger anything to happen with the API, it is just handy if you know you are supposed to be receiving a response from the API soon.
+
+### Example
+
+```python
+result = cortex.await_response( api_call=self.cortex.control_device, command="refresh")
+# call "controlDevice" with 'refresh' to start headset scanning
+print('Search will take about 20 seconds...')
+
+warning = cortex.await_warning() # wait for warning 142 (specified in documentation)
+# ^ this line will not complete executing for 20 seconds because we are waiting for the warning to come in
+print(warning)
+```
+I plan to soon add a timeout parameter in case someone calls _await_warning_ and never receieves a response.
+
 # Key Changes
+These are the key changes I made to the [cortex.py](https://github.com/Emotiv/cortex-example/blob/master/python/cortex.py) file that Emotiv provides, as well as the overall approach.
 
 ## WebSocket Response Handling
 **emit** result instead of **handle** result (and so on for error, warning, stream_data)
